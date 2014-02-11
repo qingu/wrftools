@@ -26,9 +26,8 @@ def expand_cmd_args(args):
     lexp = re.compile("\[.*\]")
     for (k,v) in args.items():
         print k,v
-        if v and lexp.match(v):
+        if v and type(v)==type("") and lexp.match(v):
             jv = json.loads(v)
-            print type(jv)
             jargs[k] = jv
         else:
             jargs[k] = v

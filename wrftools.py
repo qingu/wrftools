@@ -88,7 +88,8 @@ from visualisation import *
 from customexceptions import *
 import logging
 
-from tseries import extract_tseries, tseries_to_json, json_to_web
+from tseries import extract_tseries, json_to_web
+from ncdump import ncdump_wrftools as ncdump
 from power import power, PowerCurve
 from queue import fill_template, qsub, qstat
 
@@ -379,16 +380,18 @@ def transfer(flist, dest, mode='copy', debug_level='NONE'):
     for f in flist:
         fname = os.path.split(f)[1]
         dname = '%s/%s' % (dest, fname)
-        logger.debug(dname)
+        #logger.debug(dname)
         # bit dangerous, could delete then fail
         if os.path.exists(dname):
             os.remove(dname)
 
         shutil.copy2(f, dname)
         if debug_level=='DEBUG':
-            logger.debug('copied %s ---------> %s' % (f, dname))
+            pass
+            #logger.debug('copied %s ---------> %s' % (f, dname))
         elif debug_level=='INFO':
-            logger.info('copied %s ---------> %s' % (f, dname))
+            pass
+            #logger.info('copied %s ---------> %s' % (f, dname))
         if mode=='move':
             os.remove(f)                        
         n+=1

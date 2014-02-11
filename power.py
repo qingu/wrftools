@@ -193,7 +193,7 @@ def example_interpolation():
 
 def power(config):
     """Reads 'time series' from netcdf time series file, and adds power as a variable. """
-    
+    import netCDF4
     from netCDF4 import Dataset
     from netCDF4 import netcdftime
     
@@ -309,28 +309,47 @@ def power(config):
     #print pdata[:,7,0,1]  # P10
     #print pdata[:,7,0,2]  # P90  
     
-    pavg    = dataset.createVariable('POWER','f',('time','location','height'))
-    pavg.units = 'kW'
-    pavg.description = 'forecast power output'
-    pavg[:] = pdata[:,:,:,0]
+    if 'POWER' not in dataset.variables:
+        logger.debug("power exists, ovewriting")
+
+        pavg    = dataset.createVariable('POWER','f',('time','location','height'), fill_value=netCDF4.default_fillvals['f8'])
+        pavg.units = 'kW'
+        
+        pavg.description = 'forecast power output'
+        pavg[:] = pdata[:,:,:,0]
 
     
-    for q, qval in enumerate(quantiles):
+        for q, qval in enumerate(quantiles):
 
-        varname = 'POWER.Q%02d' % qval
-        logger.debug("creating variable %s" % varname)
-        var  = dataset.createVariable(varname,'f',('time','location','height'))
-        if pnorm:
-            var.units = 'ratio'
-        else:
-            var.units = 'kW'
-        var.description = 'forecast power output'
-        print pdata[:,:,:,q+1]
-        var[:] = pdata[:,:,:,q+1]
+            varname = 'POWER.P%02d' % qval
+            logger.debug("creating variable %s" % varname)
+            var  = dataset.createVariable(varname,'f',('time','location','height'),fill_value=netCDF4.default_fillvals['f8'])
+            if pnorm:
+                var.units = 'ratio'
+            else:
+                var.units = 'kW'
+            var.description = 'forecast power output'
+            var[:] = pdata[:,:,:,q+1]
     
-            
+    else:
+        pavg = dataset.variables['POWER']
+        pavg[:] = pdata[:,:,:,0]
+        
+        for q, qval in enumerate(quantiles):
+            varname = 'POWER.P%02d' % qval
+            logger.debug("creating variable %s" % varname)
+            var  = dataset.variables[varname]
+            if pnorm:
+                var.units = 'ratio'
+            else:
+                var.units = 'kW'
+            var.description = 'forecast power output'
+            var[:] = pdata[:,:,:,q+1]
 
-    
+
+
+
+        
     dataset.close()
 
 
