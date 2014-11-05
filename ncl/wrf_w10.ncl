@@ -6,15 +6,30 @@ load "$NCARG_ROOT/lib/ncarg/nclscripts/wrf/WRFUserARW.ncl"
 ;gsn_define_colormap(wks,"wind_17lev")
 begin
 
+
 ;******************************************************
-; Fetch some settings from environment variables
+
+  print("\n\n**********************************************")
+  print("wrf_precip.ncl")
+
 ;******************************************************
-  File     = getenv("FCST_FILE")
-  type     = getenv("NCL_OUT_TYPE")
-  diro     = getenv("NCL_OUT_DIR")
-  domain   = getenv("NEST_ID")    
-  run_hour = getenv("RUN_HOUR")
-  loc_file = getenv("LOCATIONS_FILE")
+
+;******************************************************
+; 
+; NCL expects some or all of the following to be defined on 
+; the command-line
+; ncl_in_file
+; ncl_out_dir
+; ncl_out_file
+; ncl_out_type
+; ncl_loc_file
+; ncl_opt_file
+;**************************************************************
+
+  File     = ncl_in_file
+  type     = ncl_out_type
+  diro     = ncl_out_dir
+  loc_file = ncl_loc_file
   prefix   = "w10"
 
 ;******************************************************
@@ -25,6 +40,7 @@ begin
 ; The WRF ARW input file.  
 ;
   a = addfile(File,"r")
+  domain = sprinti("%0.2i",a@GRID_ID)
 
  colors = (/"white","black","white","yellow","orange","DarkOrange",\
              "OrangeRed","Red1","Red2","Red4","DarkOrchid1","purple",\
@@ -114,7 +130,8 @@ do i=0,ntimes-1
     ; Plotting options for Wind Vectors                 
     opts = res         
     opts@FieldTitle = "Wind"       ; overwrite Field Title
-    opts@NumVectors = 47           ; density of wind barbs
+    ;opts@NumVectors = 47           ; density of wind barbs
+    opts@vcMinDistanceF = 0.08      ; minimum distance between barbs
     vector = wrf_vector(a,wks,u10,v10,opts)
     delete(opts)
     

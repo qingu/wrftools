@@ -33,7 +33,6 @@ def to_json(frame):
     """ convert a pandas dataframe to json representation """
     frame = frame.set_index(['location_id','nest_id', 'variable', 'height'])
     logger=wrftools.get_logger()
-    logger.debug(frame)
     groupby = frame.index.names
     grouped = frame.groupby(level=groupby)
     ngroups = grouped.ngroups
@@ -91,68 +90,9 @@ def tseries_to_json(config):
   
     logger.info('*** WRITTEN JSON DATA ***')
 
-def json_to_web(config):
-    logger = wrftools.get_logger()
-
-    model_run_dir = config['model_run_dir']
-    init_time   = config['init_time']
-    json_dir    = '%s/json' % model_run_dir
-    json_files   =  glob.glob('%s/*.json' % json_dir)
-    json_web_dir     = wrftools.sub_date(config['json_web_dir'], init_time)
-    
-    logger.info('*** COPYING JSON TO WEB DIR ***')
-    
-    wrftools.transfer(json_files,json_web_dir, mode='copy', debug_level='NONE')
-    logger.info('*** COPIED JSON DATA ***')
 
 
-def extract_tseries(config):
 
-    logger = wrftools.get_logger()
-    logger.info('*** EXTRACTING TIME SERIES ***')
-     
-    wrfout_dir     = config['wrfout_dir']
-    tseries_dir    = config['tseries_dir']
-    json_dir       = config['json_dir']
-    init_time      = config['init_time']
-    dom            = config['dom']
-    fcst_file      = '%s/wrfout_d%02d_%s:00:00.nc' %(wrfout_dir, dom, init_time.strftime("%Y-%m-%d_%H")) # note we add on the nc extension here
-    loc_file       = config['locations_file']
-    ncl_code       = config['tseries_code']
-    extract_hgts   = config['extract_hgts']
-    tseries_fmt    = config['tseries_fmt']
-    ncl_opt_file   = config['ncl_opt_file']
-    
-    
-    ncl_log        = config['ncl_log']
-    if not os.path.exists(tseries_dir):
-        os.makedirs(tseries_dir)
-    
-    # Always go via the netcdf file
-    tseries_file = '%s/tseries_d%02d_%s.nc' % (tseries_dir, dom,init_time.strftime("%Y-%m-%d_%H"))
-
-    os.environ['FCST_FILE']      = fcst_file
-    os.environ['LOCATIONS_FILE'] = loc_file
-    os.environ['NCL_OUT_DIR']    = tseries_dir
-    os.environ['NCL_OUT_FILE']   = tseries_file
-    os.environ['NCL_OPT_FILE']   = ncl_opt_file
-    
-    
-    logger.debug('Setting environment variables')
-    logger.debug('FCST_FILE    ----> %s'  % fcst_file)
-    logger.debug('NCL_OUT_DIR  ----> %s'  % tseries_dir)
-    logger.debug('NCL_OUT_FILE  ----> %s' % tseries_file)
-    logger.debug('LOCATIONS_FILE ----> %s' % loc_file)
-    logger.debug('NCL_OPT_FILE   ----> %s' % ncl_opt_file)
-    logger.debug(extract_hgts)
-
-    ncl_hgts = '(/%s/)' % ','.join(map(str,extract_hgts))
-    
-    for script in ncl_code:
-        cmd  = "ncl 'extract_heights=%s'  %s >> %s 2>&1" % (ncl_hgts,script, ncl_log)
-        wrftools.run_cmd(cmd, config)
-
-    ncdump.ncdump_wrftools(config)
     
     #if 'aot' in tseries_fmt:
     #    ncdump.write_aot_files([tseries_file], tseries_dir)

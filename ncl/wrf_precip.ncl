@@ -10,24 +10,29 @@ load "$NCARG_ROOT/lib/ncarg/nclscripts/csm/gsn_code.ncl"
 load "$NCARG_ROOT/lib/ncarg/nclscripts/wrf/WRFUserARW.ncl"
 
 begin
+  print("\n\n**********************************************")
+  print("wrf_precip.ncl")
 
-;
-;  The WRF ARW input file.  
-;
-  File    = getenv("FCST_FILE")
-  type    = getenv("NCL_OUT_TYPE")
-  diro    = getenv("NCL_OUT_DIR")
-  ;web_dir = getenv("WEB_DIR")
-  domain  = getenv("NEST_ID")    
-  run_hour = getenv("RUN_HOUR")
+  ; NCL expects some or all of the following to be defined on 
+  ; the command-line
+  ; ncl_in_file
+  ; ncl_out_dir
+  ; ncl_out_file
+  ; ncl_out_type
+  ; ncl_loc_file
+  ; ncl_opt_file
+    
+  if isdefined("ncl_opt_file") then 
+    loadscript(opt_file)
+  end if
+    
 
-  print("File: "+ File)
-  print("diro: " + diro)
-  print("domain: " + domain)
 
-  a = addfile(File,"r")
-  print("reading file "+File)
 
+  print("reading file "+ncl_in_file)
+  a = addfile(ncl_in_file,"r")
+  
+  
   res = True
   res@MainTitle = "REAL-TIME WRF"
   res@Footer = False
@@ -55,24 +60,23 @@ begin
 ;********************************************
  
   Times  = wrf_user_list_times(a)  ; get times in the file
-  print("times:"+Times)
   ntimes = dimsizes(Times) 
- 
- mpres@mpDataBaseVersion     = "Ncarg4_1"          ; higher res data base
-  if (a@GRID_ID .eq. 3) then
+  print(ntimes)
+  mpres@mpDataBaseVersion     = "Ncarg4_1"          ; higher res data base
+  if (a@GRID_ID .ge. 3) then
     mpres@mpDataBaseVersion  = "HighRes"
   end if
 
-  do it = 1,ntimes-1,1
+  do it = 1,ntimes-1
 
     ff = floattointeger(a->XTIME/60.)
 
-    PlotName = diro+"/pp_d"+domain+"_"+sprinti("%0.2i",ff(it))
+    PlotName = ncl_out_dir+"/pp_d"+sprinti("%0.2i",a@GRID_ID)+"_"+sprinti("%0.2i",ff(it))
     print("PlotName: "+PlotName)
-    wks = gsn_open_wks(type,PlotName)
+    wks = gsn_open_wks(ncl_out_type,PlotName)
     colors = (/"white","black","white","yellow","orange","DarkOrange",\
              "OrangeRed","Red1","Red2","Red4","DarkOrchid1","purple",\
-             "MediumPurple3","Blue2","Blue4","DarkOliveGreen3"/)
+             "MediumPurple3", "Violet","darkviolet","lightblue1", "Blue2","Blue4","DarkOliveGreen3"/)
 
     gsn_define_colormap(wks, colors)  
     print("Working on time: " + Times(it) )
@@ -107,10 +111,10 @@ begin
     opts_r = res                        
     opts_r@UnitLabel            = "mm"
     opts_r@cnLevelSelectionMode = "ExplicitLevels"
-    opts_r@cnLevels             = (/ .1, .5, 1., 2., 3., 4. /)
+    opts_r@cnLevels             = (/ .1, .5, 1., 2., 3., 4., 5., 8., 10. /)
     opts_r@cnFillColors         = (/"transparent","Yellow","orange",\
                                    "DarkOrange",\
-                                   "OrangeRed","Red1","Violet"/)
+                                   "OrangeRed","Red1","Violet", "darkviolet", "lightblue1", "white"/)
     opts_r@cnInfoLabelOn        = False
     opts_r@cnConstFLabelOn      = False
     opts_r@cnFillOn             = True
@@ -125,9 +129,11 @@ begin
 
 
   end do        ; END OF TIME LOOP
- 
- ;updated = systemfunc("cp "+diro+"/*.png "+web_dir)
- ;clean = systemfunc("rm "+diro+"/*.png")
+
+  print("wrf_precip.ncl")  
+  print("\n\n**********************************************")
+
+
 ;********************************************
 
 end

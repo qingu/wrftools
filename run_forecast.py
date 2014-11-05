@@ -1,36 +1,174 @@
 """ Script for running a WRF forecast and all of the pre-processsing, 
 post-processing, visualization and verification which goes with it.
-The philosophy is to keep this script as simple and clean as possible 
-to represent the high-level progamme flow. 
 
-The first argument MUST BE a configuration file which sets most of the options.  
-These options can be overridden by speciying further arguments in the form: --key=value. 
-Each stage in the process should try and follow the same loop structure."""
+Config comes from a file, specified in an argument to the --config option.
+Configuation can also be given at the command lind, and these will override
+the configuration file. See example/forecast.yaml for an annotated list 
+of options. 
+
+Usage:
+    run_forecast.py [--config=<file>] [options]
+
+See examples/forecast.yaml for an annotated list of options
+
+Options:
+    --archive_mode=<str>
+    --bdy_conditions=<str>
+    --bdy_interval=<int>
+    --cmd_timing=<bool>
+    --compress=<bool>
+    --compression_level=<int>
+    --config=<str>
+    --convert_grb=<bool>
+    --create_dirs=<list>
+    --cycles=<str>
+    --delay=<int>
+    --dispatch=<bool>
+    --dispatch_json=<str>
+    --domain=<str>
+    --dstd=<float>
+    --end=<datetime.datetime>
+    --extract=<bool>
+    --extract.tseries=<bool>
+    --extract_hgts=<str>
+    --fail_mode=<str>
+    --fcst_hours=<int>
+    --fetch=<bool>
+    --fetch.gribmaster=<bool>
+    --fetch.sst=<bool>
+    --finalise=<bool>
+    --finalise.link=<list>
+    --finalise.move=<list>
+    --finalise.remove=<list>
+    --full_trace=<bool>
+    --geo_em_dir=<str>
+    --gm_dataset=<str>
+    --gm_delay=<int>
+    --gm_dir=<str>
+    --gm_log=<str>
+    --gm_max_attempts=<int>
+    --gm_sleep=<int>
+    --gm_transfer=<str>
+    --grb_dir=<str>
+    --grb_fmt=<str>
+    --grb_input_fmt=<str>
+    --history_interval=<int>
+    --host_file=<str>
+    --init_interval=<int>
+    --job_script=<str>
+    --job_template=<str>
+    --json_dir=<str>
+    --json_web_dir=<str>
+    --link=<list>
+    --locations_file=<str>
+    --log_file=<str>
+    --log_fmt=<str>
+    --log_level=<str>
+    --mail_buffer=<int>
+    --mail_level=<str>
+    --mail_subject=<str>
+    --mailto=<str>
+    --max_dom=<int>
+    --max_job_time=<dict>
+    --met_em_dir=<str>
+    --metadata=<bool>
+    --model=<str>
+    --model_run=<str>
+    --namelist_input=<str>
+    --namelist_wps=<str>
+    --ncdump=<str>
+    --ncl_code=<str>
+    --ncl_code_dir=<str>
+    --ncl_log=<str>
+    --ncl_ol_code=<str>
+    --ncl_ol_out_dir=<str>
+    --ncl_ol_web_dir=<str>
+    --ncl_opt_file=<str>
+    --ncl_out_dir=<str>
+    --ncl_out_type=<str>
+    --ncl_web_dir=<str>
+    --num_procs=<dict>
+    --operational=<bool>
+    --pcurve_dir=<str>
+    --pdist=<int>
+    --pnorm=<bool>
+    --poll_interval=<dict>
+    --post=<bool>
+    --post.upp=<bool>
+    --post.compress=<bool>
+    --post.metadata=<bool>
+    --post.hyperslab=<bool>
+    --power=<bool>
+    --power_file=<str>
+    --pquants=<str>
+    --pre_clean=<list>
+    --prepare=<bool>
+    --queue=<bool>
+    --queue_name=<dict>
+    --run_level=<str>
+    --simulate=<bool>
+    --simulate.geogrid=<bool>
+    --simulate.metgrid=<bool>
+    --simulate.ndown=<bool>
+    --simulate.real=<bool>
+    --simulate.status=<bool>
+    --simulate.timing=<bool>
+    --simulate.ungrib=<bool>
+    --simulate.wps=<bool>
+    --simulate.wrf=<bool>
+    --sst=<bool>
+    --sst_delay=<int>
+    --sst_filename=<str>
+    --sst_local_dir=<str>
+    --sst_server=<str>
+    --sst_server_dir=<str>
+    --sst_vtable=<str>
+    --sstd=<float>
+    --start=<datetime.datetime>
+    --status_file=<str>
+    --tansfer.dispatch=<bool>
+    --tmp_dir=<str>
+    --transfer=<bool>
+    --transfer.archive=<bool>
+    --transfer_files=<list>
+    --tseries_code=<str>
+    --tseries_dir=<str>
+    --tseries_fmt=<str>
+    --upp_dir=<str>
+    --visualise=<bool>
+    --visualise.ol=<bool>
+    --visualise.ncl=<bool>
+    --vtable=<dict>
+    --web_dir=<str>
+    --working_dir=<str>
+    --wps_dir=<str>
+    --wps_run_dir=<str>
+    --wrf_dir=<str>
+    --wrf_run_dir=<str>
+    --wrfout_dir=<str>
+    --wrftools_dir=<str>"""
 
 
 import sys
 import time, datetime
-import wrftools
-import logging
+from wrftools import confighelper as conf
+import pprint
+from wrftools import shared
+from wrftools import prepare
+from wrftools import fetch
+from wrftools import simulate
+from wrftools import visualise
+from wrftools import post
+from wrftools import extract
+from wrftools import finalise
 
-nl      = wrftools.read_namelist(sys.argv[1])
-config  = nl.settings
+config = conf.config(__doc__, sys.argv[1:], flatten=True, format="yaml")
 
-#************************************************
-# Allow command-line arguments to override those in the namelist file
-# no checking is done here, we just assume the arguments 
-# are given in the correct order. They should be specified like this
-#
-# --option=value 
-#************************************************
-if len(sys.argv)>2:
-    cmd_args = sys.argv[2:]
-    wrftools.add_cmd_args(config, cmd_args)
 
 #************************************************
 # Logging
 #************************************************
-logger = wrftools.create_logger(config)
+logger = shared.create_logger(config)
     
     
 
@@ -38,23 +176,11 @@ logger = wrftools.create_logger(config)
 # Get some required settings
 #************************************************
 fcst_hours   = config['fcst_hours']               # forecast length
-base_dir     = config['base_dir']
-domain       = config['domain']
-max_dom      = config['max_dom']                  # number of nested domains
+domain       = config['domain']                   # name of domain 
+max_dom      = config['max_dom']                  # number of nests
 fail_mode    = config['fail_mode']                # what to do on failure
-
-
-
-#***********************************************
-# Initial checks
-#***********************************************
-try:
-    wrftools.check_config(config)
-except KeyError:
-    logger.error('required setting missing')
-    sys.exit()
-
-
+full_trace   = config['full_trace']               # print a full stack trace
+run_level    = config['run_level']
 
 #************************************************
 # Main options. Unpack from config to make sure 
@@ -62,55 +188,57 @@ except KeyError:
 # is not needed, why should it be defined?
 #************************************************
 logger.info('*** FORECAST CYCLE STARTED ***')
-config['simulation_start'] = datetime.datetime.now()
+config['simulation.start'] = datetime.datetime.now()
 
-run_level           = config['run_level']
-fail_mode           = config['fail_mode']
-full_trace          = config['full_trace']
-gribmaster          = config['gribmaster']
-sst                 = config['sst']
-wps                 = config['wps']
-ungrib              = config['ungrib']
-geogrid             = config['geogrid']
-metgrid             = config['metgrid']
-ndown               = config['ndown']
-real                = config['real']
-wrf                 = config['wrf']
-upp                 = config['upp']
-post                = config['post']
-time_series         = config['tseries']
-compress            = config['compress']
-metadata            = config['metadata']
-power               = config['power']
-ncl                 = config['ncl']
-scripts             = config['scripts']
-met                 = config['met']
-convert_grb         = config['convert_grb']
-timing              = config['timing'] # produce timing information
-web                 = config['web']
-dispatch            = config['dispatch']
-archive             = config['archive']
-cleanup             = config['cleanup']
+# run_level           = config['run_level']
+# fail_mode           = config['fail_mode']
+# full_trace          = config['full_trace']
+# fetch               = config['fetch']
+# gribmaster          = config['fetch.gribmaster']
+# convert_grb         = config['convert_grb']
+# sst                 = config['sst']
+# simulate            = config['simulate']
+# wps                 = config['simulate.wps']
+# ungrib              = config['simulate.ungrib']
+# geogrid             = config['simulate.geogrid']
+# metgrid             = config['simulate.metgrid']
+# ndown               = config['simulate.ndown']
+# real                = config['simulate.real']
+# wrf                 = config['simulate.wrf']
+# timing              = config['simulate.timing']
+# post                = config['post']
+# met                 = config['post.met']
+# compress            = config['post.compress']
+# metadata            = config['post.metadata']
+# hyperslab           = config['post.hyperslab']
+# upp                 = config['post.upp']
+# extract             = config['extract']
+# time_series         = config['extract.tseries']
+# power               = config['power']
+# visualise           = config['visualise']
+# dispatch            = config['dispatch']
+# finalise            = config['finalise']
 
 
 #**********************************************************
 # Preparation of directories
 #**********************************************************
 try:
-    wrftools.prepare(config)
+    prepare.prepare(config)
 except Exception,e:
-    wrftools.handle(e, fail_mode, full_trace)
+    shared.handle(e, fail_mode, full_trace)
     sys.exit()
 
 #**********************************************************
 # Forecast initial times
 #**********************************************************
-init_times = wrftools.get_init_times(config)
+init_times = shared.get_init_times(config)
 
 #**********************************************************
 # Main outer loop of forecast cycle
 #**********************************************************
 logger.info('Running %d hour WRF forecasts for initial times from %s to %s' %(fcst_hours,init_times[0], init_times[-1]))
+
 for init_time in init_times:
     #
     # Update the config state to reflect initial time
@@ -119,260 +247,245 @@ for init_time in init_times:
     logger.info('Running forecast from initial time: %s' %init_time) 
 
     #
-    # Gribmaster
+    # Fetch
     #
-    if gribmaster:
-        try:
-            wrftools.run_gribmaster(config)
-        except IOError, e:
-            logger.error('gribmaster failed for initial time %s' % init_time)
-            wrftools.handle(e, fail_mode, full_trace)
-    if sst:
-        wrftools.get_sst(config)
+    if config['fetch']:
+        if config['fetch.gribmaster']:
+            try:
+                fetch.run_gribmaster(config)
+            except IOError, e:
+                logger.error('gribmaster failed for initial time %s' % init_time)
+                shared.handle(e, fail_mode, full_trace)
+        if config['sst']:
+            fetch.get_sst(config)
 
-
+            
+            
     #
     # WPS
     #
-    if wps:
-        #try:
-        #    wrftools.prepare_wps(config)
-        #except IOError, e:
-        #    logger.error('WPS failed for initial time %s' %init_time)
-        #    wrftools.handle(e, fail_mode, full_trace)
+    if config['simulate'] and config['simulate.wps']:
+
         try:
-            wrftools.update_namelist_wps(config)            
+            simulate.update_namelist_wps(config)            
         except IOError, e:
-            wrftools.handle(e, fail_mode, full_trace)
+            shared.handle(e, fail_mode, full_trace)
 
 
-        if ungrib:
+        if config['simulate.ungrib']:
             try:        
-                wrftools.run_ungrib(config)
+                simulate.run_ungrib(config)
             except Exception, e:
-                wrftools.handle(e, fail_mode, full_trace)
+                shared.handle(e, fail_mode, full_trace)
         
-        if sst:
+        if config['simulate.ungrib'] and config['sst']:
             try:
-                wrftools.ungrib_sst(config)
+                simulate.ungrib_sst(config)
             except Exception, e:
-                wrftools.handle(e, fail_mode, full_trace)
+                shared.handle(e, fail_mode, full_trace)
 
-        if geogrid:
+        if config['simulate.geogrid']:
             try:
-                wrftools.run_geogrid(config)
+                simulate.run_geogrid(config)
             except Exception, e:
-                wrftools.handle(e, fail_mode, full_trace)
+                shared.handle(e, fail_mode, full_trace)
         
-        if metgrid:
+        if config['simulate.metgrid']:
             try:
-                wrftools.run_metgrid(config)
+                simulate.run_metgrid(config)
             except Exception, e:
-                wrftools.handle(e, fail_mode, full_trace)
+                shared.handle(e, fail_mode, full_trace)
 
-    #
-    # ndown
-    #
-    if ndown:
-        try:
-            if real:
-                wrftools.run_real(config)
-            wrftools.prepare_ndown(config)
-            wrftools.run_ndown(config)
-        except Exception, e:
-            wrftools.handle(e, fail_mode, full_trace)
 
-    
+   
     
     #
     # WRF standard preparation
     #           
-    if wrf and not ndown:
+    if config['simulate'] and config['simulate.wrf']:
         try:
-            wrftools.prepare_wrf(config)
-            wrftools.update_namelist_input(config)
+            simulate.prepare_wrf(config)
+            simulate.update_namelist_input(config)
         except Exception, e:
-            wrftools.handle(e, fail_mode, full_trace)
+            shared.handle(e, fail_mode, full_trace)
         
-        if real:
+        if config['simulate.real']:
             try:
-                wrftools.run_real(config)
+                simulate.run_real(config)
             except Exception, e:
-                wrftools.handle(e, fail_mode, full_trace)
+                shared.handle(e, fail_mode, full_trace)
     
     #
     # WRF runs
     #
-    if wrf:
+    if config['simulate'] and config['simulate.wrf']:
         try:
-            wrftools.run_wrf(config)
+            simulate.run_wrf(config)
         except Exception, e:
-            wrftools.handle(e, fail_mode, full_trace)
+            shared.handle(e, fail_mode, full_trace)
         
-        if timing:
+        if config['simulate.timing']:
             try:
-                wrftools.timing(config)
+                simulate.timing(config)
             except Exception, e:
-                wrftools.handle(e, fail_mode, full_trace)
+                shared.handle(e, fail_mode, full_trace)
         try:
-           wrftools.move_wrfout_files(config) # this will also copy namelists, logs etc
+           simulate.move_wrfout_files(config) # this will also copy namelists, logs etc
         except Exception, e:
-            wrftools.handle(e, fail_mode, full_trace)
+            shared.handle(e, fail_mode, full_trace)
     
-    
-    if 'status' in config and config['status']:
+    # 
+    if config['simulate'] and config['simulate.status']:
         logger.debug("writing status file")
         try:
-            config['simulation_complete'] = datetime.datetime.now()
-            wrftools.status(config)
+            config['simulation.complete'] = datetime.datetime.now()
+            shared.status(config)
         except Exception, e:
             logger.error('*** FAIL STATUS WRITE ***')
-            wrftools.handle(e, fail_mode, full_trace)
+            shared.handle(e, fail_mode, full_trace)
 
     
     
-    #
-    # Post processing
-    #
-    if post:
-        if compress:
-            try:
-                wrftools.compress(config)
-            except Exception, e:
-                wrftools.handle(e, fail_mode, full_trace)
-
-        
-        if metadata:
-            try:
-                wrftools.add_metadata(nl)
-            except Exception, e:
-                wrftools.handle(e, fail_mode, full_trace)
-        
-   
-    
-        if upp:
-            for d in range(1,max_dom+1):
-                try:
-                    config['dom'] = d
-                    wrftools.run_unipost(config)
-                except Exception, e:
-                    logger.error('*** FAIL TIME SERIES ***')
-                    wrftools.handle(e, fail_mode, full_trace)
-                    
-        if convert_grb:
-            for d in range(1,max_dom+1):
-                try:
-                    config['dom'] = d
-                    wrftools.convert_grib(config)
-                except Exception, e:
-                    logger.error('*** FAIL GRIB CONVERSION ***')
-                    wrftools.handle(e, fail_mode, full_trace)
-
-
-                
-                
-    #
-    # Met verification tools
-    #
-    if met:
-        for d in range(1,max_dom+1):        
-            try:
-                config['dom'] = d
-                wrftools.run_point_stat(config)
-            except Exception, e:
-                wrftools.handle(e, fail_mode, full_trace)
-
         
     #
     # Visualisation
     #
-    if ncl:
-        for d in range(1,max_dom+1):
-            try:
-                logger.debug('Processing domain d%02d' %d)
-                config['dom'] = d
-                wrftools.produce_ncl_plots(config)
-            except Exception, e:
-                logger.error('*** FAIL NCL ***')
-                wrftools.handle(e, fail_mode, full_trace)
-    
-        
-        if config['openlayers']:
+    if config['visualise']:
+        if config['visualise.ncl']:
             for d in range(1,max_dom+1):
                 try:
                     logger.debug('Processing domain d%02d' %d)
                     config['dom'] = d
-                    wrftools.produce_ncl_ol_plots(config)
+                    visualise.produce_ncl_plots(config)
+                except Exception, e:
+                    logger.error('*** FAIL VISUALISE ***')
+                    shared.handle(e, fail_mode, full_trace)
+    
+        
+        if config['visualise.ol']:
+            for d in range(1,max_dom+1):
+                try:
+                    logger.debug('Processing domain d%02d' %d)
+                    config['dom'] = d
+                    visualise.produce_ncl_ol_plots(config)
                 except Exception, e:
                     logger.error('*** FAIL NCL ***')
-                    wrftools.handle(e, fail_mode, full_trace)
+                    shared.handle(e, fail_mode, full_trace)
     
-        if web:
-            wrftools.transfer_to_web_dir(config)
-
-    if time_series:
+    
+    #
+    # Time series extraction
+    #
+    if config['extract'] and config['extract.tseries']:
         for d in range(1,max_dom+1):
             try:
                 logger.debug('Processing domain d%02d' %d)
                 config['dom'] = d
-                wrftools.extract_tseries(config)
+                config['grid_id'] = d
+                extract.extract_tseries(config)
             except Exception, e:
                 logger.error('*** FAIL NCL TIME SERIES ***')
-                wrftools.handle(e, fail_mode, full_trace)
+                shared.handle(e, fail_mode, full_trace)
 
                 
+               
+                
     #
-    # Some bug seems to be creeping in, causing the programme to 
-    # fail silently around here. I'm adding a sleep statement
-    # as I have a hunch this might be some kind of race condition
+    # Met verification tools
     #
-    #logger.warn('*** SLEEPING FOR 1 SECONDS TO ENSURE TSERIES FILES ARE CLOSED ***')
-    #time.sleep(1)
+    if config['post'] and config['post.met']:
+        for d in range(1,max_dom+1):        
+            try:
+                config['dom'] = d
+                post.run_point_stat(config)
+            except Exception, e:
+                shared.handle(e, fail_mode, full_trace)
 
+   
     
-    
-    
-    if power:
+    #
+    # Power prediction 
+    #
+    if config['power']:
+        from wrftools import power
         for d in range(1,max_dom+1):
             try:
                 config['dom'] = d
-                wrftools.power(config)
+                config['grid_id'] = d
+                power.power(config)
             except Exception, e:
                 logger.error('*** FAIL POWER CONVERSION ***')
-                wrftools.handle(e, fail_mode, full_trace)
+                shared.handle(e, fail_mode, full_trace)
 
 
-    if time_series:
+    if config['extract'] and config['extract.tseries']:
         for d in range(1,max_dom+1):
             try:
                 config['dom'] = d
-                wrftools.ncdump(config)
+                extract.ncdump(config)
             except Exception, e:
                 logger.error('*** FAIL TIME SERIES DUMPING  ***')
-                wrftools.handle(e, fail_mode, full_trace)
+                shared.handle(e, fail_mode, full_trace)
 
-    if web:
-        logger.info('*** TRANSFERRING JSON TO WEB DIR ***')
-        try:
-            wrftools.json_to_web(config)
-        except Exception,e:
-            logger.error('*** FAIL TRANSFERRING JSON ***')
-            wrftools.handle(e, fail_mode, full_trace)
 
             
-    if dispatch:
+    if config['dispatch']:
+        from wrftools import dispatch
         dry_run = run_level=='DUMMY'
-        wrftools.dispatch.dispatch_all(config['dispatch_json'], init_time, dry_run, log_name=wrftools.LOGGER)
+        dispatch.dispatch(config)
 
-    if archive:
-        logger.debug("moving files to longbackup")
-        wrftools.archive(config)
+        
+    #
+    # Post processing - do this after visualisation
+    #
+    if config['post']:
+        
+        if config['post.hyperslab']:
+            try:
+                post.hyperslab(config)
+            except Exception, e:
+                shared.handle(e, fail_mode, full_trace)
 
-    if cleanup:
-        logger.debug("cleaning up files")
-        wrftools.cleanup(config)
 
+        if config['post.compress']:
+            try:
+                post.compress(config)
+            except Exception, e:
+                shared.handle(e, fail_mode, full_trace)
+        
+        
+        
+        
+        if config['post.metadata']:
+            try:
+                post.add_metadata(config)
+            except Exception, e:
+                shared.handle(e, fail_mode, full_trace)
+        
+   
+    
+        if config['post.upp']:
+            for d in range(1,max_dom+1):
+                try:
+                    config['dom'] = d
+                    post.run_unipost(config)
+                except Exception, e:
+                    logger.error('*** FAIL TIME SERIES ***')
+                    shared.handle(e, fail_mode, full_trace)
+                    
+        
+    if config['finalise']:
+        logger.info('*** FINALISE ***')
+        
+        try:
+            finalise.finalise(config)
+        except Exception,e:
+            logger.error('*** FAIL FINALISE ***')
+            shared.handle(e, fail_mode, full_trace)
+
+        
+        
 
 # Final code to get executed
 logger.debug('Shutting down the logging framework')
-logging.shutdown()
+shared.shutdown()
